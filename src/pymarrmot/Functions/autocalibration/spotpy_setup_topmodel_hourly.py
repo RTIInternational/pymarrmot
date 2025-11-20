@@ -14,23 +14,23 @@ class spotpy_setup(object):
 
     # Step 1: Define the parameters of the model as class parameters
     par_ranges = {
-        'suzmax': [1, 2000],   
-        'st': [0.05, 0.95],
-        'kd': [0, 1],        
-        'q0': [0.1, 200],
-        'f': [0, 1],        
-        'chi': [1, 7.5],
-        'phi': [0.1, 5]
+        'suzmax': [1, 2000],    # suzmax, Maximum soil moisture storage in unsaturated zone [mm]
+        'st': [0.05, 0.95],     # st, Threshold for flow generation and evap change as fraction of suzmax [-]  
+        'kd': [0, 1],           # kd, Leakage to saturated zone flow coefficient [mm/d]
+        'q0': [0.1, 200],       # q0, Zero deficit base flow speed [mm/d]
+        'f': [0, 1],            # f, Baseflow scaling coefficient [mm-1]
+        'chi': [1, 7.5],        # chi, Gamma distribution parameter [-]
+        'phi': [0.1, 5]         # phi, Gamma distribution parameter [-]
         }
     
     # parameters that will be calibrated by Spotpy
-    suzmax = Uniform(low=par_ranges['suzmax'][0], high=par_ranges['suzmax'][1], optguess=1000)  # suzmax, Maximum soil moisture storage in unsaturated zone [mm]
-    st = Uniform(low=par_ranges['st'][0], high=par_ranges['st'][1], optguess=0.5)               # st, Threshold for flow generation and evap change as fraction of suzmax [-]
-    kd = Uniform(low=par_ranges['kd'][0], high=par_ranges['kd'][1], optguess=0.5)               # kd, Leakage to saturated zone flow coefficient [mm/d]
-    q0 = Uniform(low=par_ranges['q0'][0], high=par_ranges['q0'][1], optguess=100)               # q0, Zero deficit base flow speed [mm/d]
-    f = Uniform(low=par_ranges['f'][0], high=par_ranges['f'][1], optguess=0.5)                  # f, Baseflow scaling coefficient [mm-1]
-    chi = Uniform(low=par_ranges['chi'][0], high=par_ranges['chi'][1], optguess=4.25)           # chi, Gamma distribution parameter [-]
-    phi = Uniform(low=par_ranges['phi'][0], high=par_ranges['phi'][1], optguess=2.55)           # phi, Gamma distribution parameter [-]
+    suzmax = Uniform(low=par_ranges['suzmax'][0], high=par_ranges['suzmax'][1], optguess=1000)  
+    st = Uniform(low=par_ranges['st'][0], high=par_ranges['st'][1], optguess=0.5)               
+    kd = Uniform(low=par_ranges['kd'][0], high=par_ranges['kd'][1], optguess=0.5)               
+    q0 = Uniform(low=par_ranges['q0'][0], high=par_ranges['q0'][1], optguess=100)               
+    f = Uniform(low=par_ranges['f'][0], high=par_ranges['f'][1], optguess=0.5)                  
+    chi = Uniform(low=par_ranges['chi'][0], high=par_ranges['chi'][1], optguess=4.25)           
+    phi = Uniform(low=par_ranges['phi'][0], high=par_ranges['phi'][1], optguess=2.55)           
     
     # class variables
     m = m_14_topmodel_7p_2s()
@@ -41,11 +41,10 @@ class spotpy_setup(object):
     def __init__(self,obj_func=None):
         self.obj_func = obj_func
         
-        #initial storage values - set as average of the range
-        input_s0 = []
-        #loop over par_ranges dictionary and get average value for each key
-        for key in self.par_ranges:
-            input_s0.append((self.par_ranges[key][0]+self.par_ranges[key][1])/2) 
+        # Initial storage values
+        input_s0 = np.array([1,  # SUZ [mm] is the current storage in the combined unsaturated zone and root zone
+                     1])         # SSZ [mm] is the saturated zone storage
+
 
         #Define the solver settings
         input_solver_opts = {
@@ -62,7 +61,7 @@ class spotpy_setup(object):
         #USGS 03479000 - WATAUGA RIVER NEAR SUGAR GROVE, NC - usgsbasin-03479000_combined.parquet
         #USGS 03456100 - WEST FORK PIGEON RIVER AT BETHEL, NC - usgsbasin-03456100_combined.parquet
 
-        df = pd.read_parquet('C:/Users/ssheeder/Repos/pymarrmot/forcing/pymarrmot/combined_forcing/usgsbasin-03463300_combined.parquet')
+        df = pd.read_parquet('C:/Users/ssheeder/Repos/pymarrmot/forcing/pymarrmot/combined_forcing/12_year/usgsbasin-03463300_combined.parquet')
 
         # Create a climatology data input structure
         input_climatology = {
@@ -81,6 +80,7 @@ class spotpy_setup(object):
         
         #Here the model is actually started with a unique parameter combination that it gets from spotpy for each time the model is called
         (output_ex, output_in, output_ss, output_waterbalance) = self.m.get_output(nargout=4)
+        #output_ex = self.m.get_output(nargout=1)
         return output_ex['Q'].tolist()
     
     # Step 4: Write the def evaluation function, which returns the observations
@@ -108,9 +108,9 @@ class spotpy_setup(object):
             
             # calculation of kge-lowflow (based on kge being selected as objective function)
             score = self.obj_func(evaluation_array, simulation_array)
-            eval_inverse = [1000 if (i<=0) else 1/i for i in evaluation]
-            sim_inverse = [1000 if (i<=0) else 1/i for i in simulation]
-            score2 = self.obj_func(eval_inverse, sim_inverse)
-            result = (score + score2)/2
-            like = -1*result
+            # eval_inverse = [1000 if (i<=0) else 1/i for i in evaluation]
+            # sim_inverse = [1000 if (i<=0) else 1/i for i in simulation]
+            # score2 = self.obj_func(eval_inverse, sim_inverse)
+            # result = (score + score2)/2
+            like = -1*score
         return like

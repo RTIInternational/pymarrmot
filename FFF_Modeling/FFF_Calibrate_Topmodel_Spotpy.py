@@ -31,9 +31,9 @@ if not os.path.exists('output'):
 #Set the number of model runs
 reps = 10
 spotpy_setup = setup(of.kge)
-sampler=spotpy.algorithms.sceua(spotpy_setup, dbname='./output/' + 'SCEUA_topmodel', dbformat='csv')
+sampler=spotpy.algorithms.sceua(spotpy_setup, dbname='./output/' + 'SCEUA_topmodel_hourly_south_toe_river', dbformat='csv')
 sampler.sample(reps) #, ngs=7, kstop=10, peps=0.001, pcento=0.001
-results = spotpy.analyser.load_csv_results('./output/SCEUA_topmodel')
+results = spotpy.analyser.load_csv_results('./output/SCEUA_topmodel_hourly_south_toe_river')
 
 #find the run_id with the minimal objective function value
 bestindex,bestobjf = spotpy.analyser.get_minlikeindex(results)
@@ -63,9 +63,9 @@ ax = plt.subplot(1,1,1)
 ax.plot(best_simulation,color='black',linestyle='solid', label='Best objf.='+str(bestobjf))
 ax.plot(eval_list,color='red',markersize=3, label='Observation data')
 plt.xlabel('Number of Observation Points')
-plt.ylabel ('Discharge [cfs]')
+plt.ylabel ('Discharge [mm]')
 plt.legend(loc='upper right')
-fig.savefig('SCEUA_hymod_best.png',dpi=300)
+fig.savefig('SCEUA_topmodel_hourly_south_toe_river.png',dpi=300)
 
 #FDC plot of the best model run, exceedance probability on the x-axis and discharge on the y-axis
 #Sort the simulated and observed data, and calculate the exceedance probability
@@ -81,6 +81,6 @@ ax.plot(exceedance_prob, sim_sorted, color='black', linestyle='solid', label='Si
 ax.plot(exceedance_prob, obs_sorted, color='red', linestyle='solid', linewidth= 2,label='Observed')
 plt.yscale('log')
 plt.xlabel('Exceedance Probability')
-plt.ylabel('Discharge [cfs]')
+plt.ylabel('Discharge [mm]')
 plt.legend(loc='upper right')
-fig.savefig('SCEUA_hymod_best_FDC.png', dpi=300)
+fig.savefig('SCEUA_topmodel_hourly_south_toe_river_FDC.png', dpi=300)
