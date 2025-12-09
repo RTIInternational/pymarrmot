@@ -12,6 +12,10 @@ from pymarrmot.models.flux.soil_moisture import soilmoisture_2
 from pymarrmot.models.flux.baseflow import baseflow_1
 from pymarrmot.models.auxiliary.deficit_based_distribution import deficit_based_distribution
 
+from pymarrmot.models.unit_hydro.route import route
+from pymarrmot.models.unit_hydro.uh_4_full import uh_4_full
+from pymarrmot.models.unit_hydro.update_uh import update_uh
+
 class m_33_sacramento_11p_5s(MARRMoT_model):
     """Class for hydrologic conceptual model: Sacramento-SMA
 
@@ -37,51 +41,54 @@ class m_33_sacramento_11p_5s(MARRMoT_model):
 
         self.num_stores = 5
         self.num_fluxes = 20
-        self.num_params = 11
+        self.num_params = 12
         self.jacob_pattern = np.array([[1,1,0,0,0],
-                                      [1,1,1,1,1],
-                                      [1,1,1,1,1],
-                                      [0,1,1,1,1],
-                                      [0,1,1,1,1]])
-        self.par_ranges = np.array([[0       , 1],       # pctim, Fraction impervious area [-]
-                                   [1       , 2000],     # smax, Maximum total storage depth [mm]
-                                   [0.005   , 0.995],    # f1, fraction of smax that is Maximum upper zone tension water storage [mm]
-                                   [0.005   , 0.995],    # f2, fraction of smax-S1max that is Maximum upper zone free water storage [mm]
-                                   [0       , 1],        # kuz, Interflow runoff coefficient [d-1]
-                                   [0       , 7],        # rexp, Base percolation rate non-linearity factor [-]
-                                   [0.005   , 0.995],    # f3, fraction of smax-S1max-S2max that is  Maximum lower zone tension water storage [mm]
-                                   [0.005   , 0.995],    # f4, fraction of smax-S1max-S2max-S3max that is  Maximum lower zone primary free water storage [mm]
-                                   [0       , 1],        # pfree, Fraction of percolation directed to free water stores [-]
-                                   [0       , 1],        # klzp, Primary baseflow runoff coefficient [d-1]
-                                   [0       , 1]])       # klzs, Supplemental baseflow runoff coefficient [d-1]
+                                       [1,1,1,1,1],
+                                       [1,1,1,1,1],
+                                       [0,1,1,1,1],
+                                       [0,1,1,1,1]])
+        
+        self.par_ranges = np.array([[0       , 0.05],       # pctim, Fraction impervious area [-]
+                                   [25.0    , 125.0],     #uztwm
+                                   [10.0   , 75.0],       #uzfwm
+                                   [75.0  , 300.0],       #lztwm
+                                   [0.2       , 0.5],        # kuz, Interflow runoff coefficient [d-1]
+                                   [1.4       , 3.5],        # rexp, Base percolation rate non-linearity factor [-]
+                                   [40.0   , 600.0],    # lzfpm
+                                   [15.0   , 300.0],    # lzfsm
+                                   [0       , 0.5],        # pfree, Fraction of percolation directed to free water stores [-]
+                                   [0.001   , 0.015],        # klzp, Primary baseflow runoff coefficient [d-1]
+                                   [0.03    , 0.20],       # klzs, Supplemental baseflow runoff coefficient [d-1]
+                                   [20.0    , 300.0]])      # zperc
+        
+        
         self.store_names = ["S1", "S2", "S3", "S4", "S5"]
         self.flux_names  = ["qdir", "peff", "ru", "euztw", "twexu",
                            "qsur", "qint", "euzfw", "pc", "pctw",
                            "elztw", "twexl", "twexlp", "twexls", "pcfwp",
-                           "pcfws", "rlp", "rls", "qbfp", "qbfs"]
+                           "pcfws", "rlp", "rls", "qbfp", "qbfs"] #, "qt"]
         self.flux_groups = {"Ea": [4, 8, 11], "Q": [1, 6, 7, 19, 20]}
 
     def init(self):
         theta = self.theta
-        smax    = theta[1]     # Maximum total storage depth [mm]
-        f1      = theta[2]     # fraction of smax that is Maximum upper zone tension water storage (uztwm) [-]
-        f2      = theta[3]     # fraction of smax-uztwm that is Maximum upper zone free water storage (uzfwm) [-]
-        f3      = theta[6]     # fraction of smax-uztwm-uzfwm that is Maximum lower zone tension water storage (lztwm) [-]
-        f4      = theta[7]     # fraction of smax-uztwm-uzfwm-lztwm that is Maximum lower zone primary free water storage (lzfwpm) [-]
+        pctim   = theta[0]     # Fraction impervious area [-]
+        uztwm   = theta[1]
+        uzfwm   = theta[2]
+        lztwm   = theta[3]
+        kuz     = theta[4]     # Interflow runoff coefficient [d-1]
+        rexp    = theta[5]     # Base percolation rate non-linearity factor [-]
+        lzfwpm   = theta[6]
+        lzfwsm   = theta[7]        
+        pfree   = theta[8]     # Fraction of percolation directed to free water stores [-]
         klzp    = theta[9]     # Primary baseflow runoff coefficient [d-1]
         klzs    = theta[10]    # Supplemental baseflow runoff coefficient [d-1]
-        uztwm   = f1*smax                                             # Maximum upper zone tension water storage [mm]
-        uzfwm   = max(0.005/4,f2*(smax-uztwm))                        # Maximum upper zone free water storage [mm]
-        lztwm   = max(0.005/4,f3*(smax-uztwm-uzfwm))                  # Maximum lower zone tension water storage [mm]
-        lzfwpm  = max(0.005/4,f4*(smax-uztwm-uzfwm-lztwm))            # Maximum lower zone primary free water storage [mm]
-        lzfwsm  = max(0.005/4,(1-f4)*(smax-uztwm-uzfwm-lztwm))        # Maximum lower zone supplemental free water storage [mm]
+        zperc   = theta[11]
+
         pbase   = lzfwpm*klzp + lzfwsm*klzs                           # Base percolation rate [mm/d]
-        zperc   = min(100000,
-                      (lztwm+lzfwsm*(1-klzs))/(lzfwsm*klzs+lzfwpm*klzp) + \
-                      (lzfwpm*(1-klzp))/(lzfwsm*klzs+lzfwpm*klzp))    # Base percolation rate multiplication factor [-]: can return Inf, hence the min(10000,...)
         self.theta_derived = [uztwm, uzfwm, lztwm, lzfwpm, lzfwsm,
                              pbase, zperc]
         self.store_max = np.array([uztwm,uzfwm,lztwm,lzfwpm,lzfwsm])
+
 
     def model_fun(self, S: list[float]) -> tuple[list[float], list[float]]:
         theta   = self.theta
@@ -99,8 +106,9 @@ class m_33_sacramento_11p_5s(MARRMoT_model):
         lzfwsm  = theta_d[4]   # Maximum lower zone supplemental free water storage [mm]
         pbase   = theta_d[5]   # Base percolation rate [mm/d]
         zperc   = theta_d[6]   # Base percolation rate multiplication factor [-]
+        
         delta_t = self.delta_t
-
+        
         S1 = S[0]
         S2 = S[1]
         S3 = S[2]
@@ -153,4 +161,9 @@ class m_33_sacramento_11p_5s(MARRMoT_model):
         return dS, fluxes
 
     def step(self):
+        """
+        STEP runs at the end of every timestep, use it to update
+        still-to-flow vectors from unit hydrographs
+        """
+
         pass

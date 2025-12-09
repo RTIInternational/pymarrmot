@@ -33,17 +33,32 @@ def smooth_threshold_storage_logistic(s, smax, r=0.01, e=5.0):
 
     smax = max(0, smax)
 
+    # Configure NumPy to raise an error on overflow
+    old_settings = np.seterr(over='raise') 
+    
     # Calculate multiplier
     #bug fix: 11July2024 - SAS - nested if else statement added to prevent overflow in np.exp term
+    #bug fix: 01Dec2025 - SAS - more robust handling of overflow
     if r * smax == 0:
-        if (s - smax + r * e * smax) / r >= 700:
-            out = 0
-        else:
+        # if (s - smax + r * e * smax) / r >= 700:
+        #     out = 0
+        # else:
+        #     out = 1 / (1 + np.exp((s - smax + r * e * smax) / r))
+        try:
             out = 1 / (1 + np.exp((s - smax + r * e * smax) / r))
-    else:
-        if (s - smax + r * e * smax) / (r * smax) >= 700:
+        except:
             out = 0
-        else:
+        finally:
+            np.seterr(**old_settings) # Restore original error settings
+    else:
+        # if (s - smax + r * e * smax) / (r * smax) >= 700:
+        #     out = 0
+        # else:
+        #     out = 1 / (1 + np.exp((s - smax + r * e * smax) / (r * smax)))
+        try:
             out = 1 / (1 + np.exp((s - smax + r * e * smax) / (r * smax)))
-
+        except:
+            out = 0
+        finally:
+            np.seterr(**old_settings) # Restore original error settings
     return out
